@@ -16,7 +16,7 @@ Command-line tool for converting UUIDs to compact 22-character Base58 format.
 - 📝 Batch processing from files
 - 🔍 Validate UUID and B58UUID formats
 - 🎨 Colored output
-- ⚡ Fast and lightweight (~1MB binary)
+- ⚡ Fast and lightweight (~475KB binary)
 - 🚀 Zero dependencies at runtime
 
 ## Installation
@@ -44,13 +44,13 @@ scoop install b58uuid
 ### Shell Script (macOS/Linux)
 
 ```bash
-curl -fsSL https://b58uuid.io/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/b58uuid/b58uuid-cli/main/install.sh | sh
 ```
 
 ### PowerShell (Windows)
 
 ```powershell
-iwr -useb https://b58uuid.io/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/b58uuid/b58uuid-cli/main/install.ps1 | iex
 ```
 
 ### Manual Download
@@ -207,11 +207,10 @@ $ b58uuid validate BWBeN28Vb7cMEx7Ym8AUzs
 
 ## Performance
 
-- **Binary Size**: ~1MB (optimized for size)
-- **Startup Time**: <5ms
-- **Memory Usage**: <5MB
-- **Encoding Speed**: ~1M ops/sec
-- **Decoding Speed**: ~1M ops/sec
+- **Binary Size**: ~475KB (optimized for size)
+- **Startup Time**: Instant (<5ms)
+- **Memory Usage**: Minimal (<5MB)
+- **Processing Speed**: Fast (handles millions of UUIDs efficiently)
 
 ## Building from Source
 

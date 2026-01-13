@@ -1,5 +1,5 @@
 # B58UUID CLI Installation Script for Windows
-# Usage: iwr -useb https://b58uuid.io/install.ps1 | iex
+# Usage: iwr -useb https://raw.githubusercontent.com/b58uuid/b58uuid-cli/main/install.ps1 | iex
 
 $ErrorActionPreference = 'Stop'
 

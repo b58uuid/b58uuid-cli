@@ -1,6 +1,6 @@
 #!/bin/sh
 # B58UUID CLI Installation Script
-# Usage: curl -fsSL https://b58uuid.io/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/b58uuid/b58uuid-cli/main/install.sh | sh
 
 set -e
 
@@ -38,7 +38,20 @@ detect_platform() {
             ARCH="amd64"
             ;;
         aarch64|arm64)
-            ARCH="arm64"
+            if [ "$OS" = "darwin" ]; then
+                ARCH="arm64"
+            else
+                echo "${RED}Error: ARM64 Linux is not currently supported${NC}"
+                echo "Supported platforms:"
+                echo "  - Linux x86_64"
+                echo "  - macOS x86_64 (Intel)"
+                echo "  - macOS ARM64 (Apple Silicon)"
+                echo "  - Windows x86_64"
+                echo ""
+                echo "For ARM64 Linux, please build from source:"
+                echo "  cargo install b58uuid-cli"
+                exit 1
+            fi
             ;;
         *)
             echo "${RED}Error: Unsupported architecture: $ARCH${NC}"
