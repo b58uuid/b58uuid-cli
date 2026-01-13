@@ -386,8 +386,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/b58uuid.rb
-          git commit -m "Update b58uuid to v${VERSION}"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update b58uuid to v${VERSION}"
+            git push
+          fi
 
       - name: Update Scoop bucket
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
@@ -421,5 +425,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add b58uuid.json
-          git commit -m "Update b58uuid to v${VERSION}"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update b58uuid to v${VERSION}"
+            git push
+          fi

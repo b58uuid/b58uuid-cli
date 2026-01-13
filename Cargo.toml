@@ -1,13 +1,13 @@
 [package]
-name = "b58uuid-cli"
-version = "1.0.0"
+name = "b58uuid"
+version = "1.0.1"
 edition = "2021"
 authors = ["B58UUID Contributors"]
 description = "Compact Base58 UUID Encoder CLI - Convert UUIDs to 22-character Base58 format"
 license = "MIT"
 repository = "https://github.com/b58uuid/b58uuid-cli"
 homepage = "https://b58uuid.io"
-documentation = "https://docs.rs/b58uuid-cli"
+documentation = "https://docs.rs/b58uuid"
 readme = "README.md"
 keywords = ["uuid", "base58", "cli", "encoder", "b58uuid"]
 categories = ["command-line-utilities", "encoding"]

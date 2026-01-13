@@ -68,11 +68,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "b58uuid-cli"
-version = "1.0.0"
+name = "b58uuid"
+version = "1.0.1"
 dependencies = [
  "anyhow",
- "b58uuid",
+ "b58uuid 1.0.0",
  "clap",
  "colored",
  "uuid",
