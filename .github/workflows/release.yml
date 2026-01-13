@@ -222,6 +222,9 @@ jobs:
           # Create RPM build structure
           mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
           
+          # Copy binary to SOURCES directory
+          cp b58uuid ~/rpmbuild/SOURCES/
+          
           # Create spec file
           cat > ~/rpmbuild/SPECS/b58uuid.spec << EOF
           Name:           b58uuid
@@ -230,7 +233,6 @@ jobs:
           Summary:        Compact Base58 UUID Encoder CLI
           License:        MIT
           URL:            https://b58uuid.io
-          Source0:        b58uuid-linux-amd64.tar.gz
           
           %description
           B58UUID CLI converts UUIDs to compact 22-character Base58 format.
@@ -242,7 +244,7 @@ jobs:
           
           %install
           mkdir -p %{buildroot}/usr/local/bin
-          cp %{_sourcedir}/../../../b58uuid %{buildroot}/usr/local/bin/
+          cp %{_sourcedir}/b58uuid %{buildroot}/usr/local/bin/
           chmod 755 %{buildroot}/usr/local/bin/b58uuid
           
           %files
