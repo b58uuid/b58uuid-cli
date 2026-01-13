@@ -6,44 +6,25 @@ use std::io::{self, BufRead};
 #[derive(Parser)]
 #[command(name = "b58uuid")]
 #[command(author, version)]
-#[command(about = "Compact Base58 UUID Encoder - Convert UUIDs to 22-character format")]
-#[command(long_about = "B58UUID CLI converts standard UUIDs (36 characters) to compact Base58 format (22 characters).\n\
-This reduces storage size by 39% while maintaining URL-safety and readability.\n\n\
-The tool supports encoding, decoding, generation, and validation of both UUID and B58UUID formats.")]
+#[command(about = "Convert UUIDs to compact 22-character Base58 format (36 chars → 22 chars)")]
 #[command(after_help = "EXAMPLES:\n  \
-    # Encode a UUID to B58UUID\n  \
-    b58uuid encode 550e8400-e29b-41d4-a716-446655440000\n  \
-    b58uuid enc 550e8400-e29b-41d4-a716-446655440000  # Using alias\n\n  \
-    # Decode a B58UUID to UUID\n  \
-    b58uuid decode BWBeN28Vb7cMEx7Ym8AUzs\n  \
-    b58uuid dec BWBeN28Vb7cMEx7Ym8AUzs  # Using alias\n\n  \
-    # Generate random B58UUIDs\n  \
-    b58uuid generate\n  \
-    b58uuid gen --count 5  # Generate 5 B58UUIDs\n  \
-    b58uuid gen --uuid     # Generate as standard UUID\n\n  \
-    # Validate format\n  \
-    b58uuid validate 550e8400-e29b-41d4-a716-446655440000\n  \
-    b58uuid val BWBeN28Vb7cMEx7Ym8AUzs  # Using alias\n\n  \
-    # Batch processing from stdin\n  \
-    echo '550e8400-e29b-41d4-a716-446655440000' | b58uuid encode\n  \
-    cat uuids.txt | b58uuid encode\n\n  \
-    # Batch processing from file\n  \
-    b58uuid encode --file uuids.txt\n  \
-    b58uuid decode --file b58uuids.txt\n\n  \
-    # Disable colors\n  \
-    b58uuid --no-color encode 550e8400-e29b-41d4-a716-446655440000\n\n\
-ALIASES:\n  \
-    encode    -> enc\n  \
-    decode    -> dec\n  \
-    generate  -> gen\n  \
-    validate  -> val\n\n\
-For more information, visit: https://b58uuid.io")]
+    b58uuid encode 550e8400-e29b-41d4-a716-446655440000  # or: enc\n  \
+    b58uuid decode BWBeN28Vb7cMEx7Ym8AUzs                # or: dec\n  \
+    b58uuid generate --count 5                           # or: gen\n  \
+    b58uuid validate BWBeN28Vb7cMEx7Ym8AUzs              # or: val\n  \
+    echo 'uuid...' | b58uuid encode                      # stdin\n  \
+    b58uuid encode --file uuids.txt                      # file\n\n\
+More info: https://b58uuid.io")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 
     /// Disable colored output
-    #[arg(long, global = true, help = "Disable colored output for piping or logging")]
+    #[arg(
+        long,
+        global = true,
+        help = "Disable colored output for piping or logging"
+    )]
     no_color: bool,
 
     /// Output format (currently only 'text' is supported)
@@ -53,20 +34,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Encode UUID to B58UUID format (alias: enc)
-    /// 
-    /// Converts a standard UUID (36 characters) to compact B58UUID format (22 characters).
-    /// Supports single UUID, batch processing from stdin, or file input.
+    /// Encode UUID to B58UUID (36 → 22 chars) [alias: enc]
     #[command(alias = "enc")]
     #[command(after_help = "EXAMPLES:\n  \
         b58uuid encode 550e8400-e29b-41d4-a716-446655440000\n  \
-        echo '550e8400-e29b-41d4-a716-446655440000' | b58uuid enc\n  \
+        echo 'uuid...' | b58uuid enc\n  \
         b58uuid encode --file uuids.txt")]
     Encode {
-        /// UUID to encode (reads from stdin if not provided)
-        /// 
-        /// Format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters)
-        /// Example: 550e8400-e29b-41d4-a716-446655440000
+        /// UUID to encode (or read from stdin)
         uuid: Option<String>,
 
         /// Read UUIDs from file (one per line)
@@ -74,20 +49,14 @@ enum Commands {
         file: Option<String>,
     },
 
-    /// Decode B58UUID to standard UUID format (alias: dec)
-    /// 
-    /// Converts a B58UUID (22 characters) back to standard UUID format (36 characters).
-    /// Supports single B58UUID, batch processing from stdin, or file input.
+    /// Decode B58UUID to UUID (22 → 36 chars) [alias: dec]
     #[command(alias = "dec")]
     #[command(after_help = "EXAMPLES:\n  \
         b58uuid decode BWBeN28Vb7cMEx7Ym8AUzs\n  \
-        echo 'BWBeN28Vb7cMEx7Ym8AUzs' | b58uuid dec\n  \
+        echo 'b58uuid...' | b58uuid dec\n  \
         b58uuid decode --file b58uuids.txt")]
     Decode {
-        /// B58UUID to decode (reads from stdin if not provided)
-        /// 
-        /// Format: 22 Base58 characters (no 0, O, I, l)
-        /// Example: BWBeN28Vb7cMEx7Ym8AUzs
+        /// B58UUID to decode (or read from stdin)
         b58uuid: Option<String>,
 
         /// Read B58UUIDs from file (one per line)
@@ -95,45 +64,29 @@ enum Commands {
         file: Option<String>,
     },
 
-    /// Generate random B58UUID or UUID (alias: gen)
-    /// 
-    /// Generates one or more random UUIDs in B58UUID or standard UUID format.
-    /// Uses UUID v4 (random) generation.
+    /// Generate random B58UUID or UUID [alias: gen]
     #[command(alias = "gen")]
     #[command(after_help = "EXAMPLES:\n  \
-        b58uuid generate              # Generate one B58UUID\n  \
-        b58uuid gen -n 5              # Generate 5 B58UUIDs\n  \
-        b58uuid gen --count 10        # Generate 10 B58UUIDs\n  \
-        b58uuid gen --uuid            # Generate as standard UUID\n  \
-        b58uuid gen -n 5 --uuid       # Generate 5 standard UUIDs")]
+        b58uuid generate\n  \
+        b58uuid gen -n 5\n  \
+        b58uuid gen --uuid")]
     Generate {
         /// Number of UUIDs to generate
         #[arg(short = 'n', long, default_value = "1", value_name = "COUNT")]
         count: usize,
 
-        /// Output as standard UUID instead of B58UUID
-        /// 
-        /// By default, generates B58UUID format (22 chars).
-        /// Use this flag to generate standard UUID format (36 chars).
+        /// Generate as standard UUID (36 chars) instead of B58UUID (22 chars)
         #[arg(short, long)]
         uuid: bool,
     },
 
-    /// Validate UUID or B58UUID format (alias: val)
-    /// 
-    /// Checks if the input is a valid UUID or B58UUID and displays both formats.
-    /// Returns exit code 0 for valid input, 1 for invalid input.
+    /// Validate UUID or B58UUID format [alias: val]
     #[command(alias = "val")]
     #[command(after_help = "EXAMPLES:\n  \
         b58uuid validate 550e8400-e29b-41d4-a716-446655440000\n  \
-        b58uuid val BWBeN28Vb7cMEx7Ym8AUzs\n  \
-        b58uuid validate invalid-format  # Returns exit code 1")]
+        b58uuid val BWBeN28Vb7cMEx7Ym8AUzs")]
     Validate {
-        /// Value to validate (UUID or B58UUID)
-        /// 
-        /// Accepts either:
-        ///   - Standard UUID: 36 characters with hyphens
-        ///   - B58UUID: 22 Base58 characters
+        /// UUID or B58UUID to validate
         value: String,
     },
 }

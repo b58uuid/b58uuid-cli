@@ -16,7 +16,7 @@ Command-line tool for converting UUIDs to compact 22-character Base58 format.
 - 📝 Batch processing from files
 - 🔍 Validate UUID and B58UUID formats
 - 🎨 Colored output
-- ⚡ Fast and lightweight (~475KB binary)
+- ⚡ Fast and lightweight
 - 🚀 Zero dependencies at runtime
 
 ## Installation
@@ -284,6 +284,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with [clap](https://github.com/clap-rs/clap) for CLI parsing
 - Powered by [b58uuid](https://crates.io/crates/b58uuid) library
 
----
-
-Made with ❤️ by the B58UUID community
