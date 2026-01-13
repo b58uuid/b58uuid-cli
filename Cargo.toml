@@ -1,0 +1,31 @@
+[package]
+name = "b58uuid-cli"
+version = "1.0.0"
+edition = "2021"
+authors = ["B58UUID Contributors"]
+description = "Compact Base58 UUID Encoder CLI - Convert UUIDs to 22-character Base58 format"
+license = "MIT"
+repository = "https://github.com/b58uuid/b58uuid-cli"
+homepage = "https://b58uuid.io"
+documentation = "https://docs.rs/b58uuid-cli"
+readme = "README.md"
+keywords = ["uuid", "base58", "cli", "encoder", "b58uuid"]
+categories = ["command-line-utilities", "encoding"]
+
+[[bin]]
+name = "b58uuid"
+path = "src/main.rs"
+
+[dependencies]
+b58uuid = "1.0"
+clap = { version = "4.4", features = ["derive", "cargo"] }
+anyhow = "1.0"
+colored = "2.1"
+uuid = { version = "1.6", features = ["v4"] }
+
+[profile.release]
+opt-level = "z"           # Optimize for size
+lto = true                # Enable link-time optimization
+codegen-units = 1         # Better optimization
+strip = true              # Strip symbols
+panic = "abort"           # Reduce binary size

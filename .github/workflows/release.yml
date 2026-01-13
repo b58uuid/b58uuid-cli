@@ -1,0 +1,364 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: b58uuid
+            asset_name: b58uuid-linux-amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: b58uuid
+            asset_name: b58uuid-linux-arm64
+          
+          # macOS
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: b58uuid
+            asset_name: b58uuid-darwin-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: b58uuid
+            asset_name: b58uuid-darwin-arm64
+          
+          # Windows
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: b58uuid.exe
+            asset_name: b58uuid-windows-amd64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+
+      - name: Create archive (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+          mv ${{ matrix.asset_name }}.tar.gz ../../..
+
+      - name: Create archive (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
+          mv ${{ matrix.asset_name }}.zip ../../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: |
+            ${{ matrix.asset_name }}.tar.gz
+            ${{ matrix.asset_name }}.zip
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
+
+  build-linux-packages:
+    name: Build Linux Packages
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Linux binary
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          curl -LO https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-linux-amd64.tar.gz
+          tar -xzf b58uuid-linux-amd64.tar.gz
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev rpm
+
+      - name: Build .deb package
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          ARCH="amd64"
+          
+          # Create package structure
+          mkdir -p debian-pkg/DEBIAN
+          mkdir -p debian-pkg/usr/local/bin
+          mkdir -p debian-pkg/usr/share/doc/b58uuid
+          mkdir -p debian-pkg/usr/share/man/man1
+          
+          # Copy binary
+          cp b58uuid debian-pkg/usr/local/bin/
+          chmod 755 debian-pkg/usr/local/bin/b58uuid
+          
+          # Create control file
+          cat > debian-pkg/DEBIAN/control << EOF
+          Package: b58uuid
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: ${ARCH}
+          Maintainer: B58UUID Contributors <hello@b58uuid.io>
+          Description: Compact Base58 UUID Encoder CLI
+           Convert UUIDs to 22-character Base58 format.
+           Supports encoding, decoding, generation, and validation.
+          Homepage: https://b58uuid.io
+          EOF
+          
+          # Copy documentation
+          cp README.md debian-pkg/usr/share/doc/b58uuid/
+          cp LICENSE debian-pkg/usr/share/doc/b58uuid/
+          cp CHANGELOG.md debian-pkg/usr/share/doc/b58uuid/
+          
+          # Create man page
+          cat > debian-pkg/usr/share/man/man1/b58uuid.1 << 'EOF'
+          .TH B58UUID 1 "2026-01-13" "${VERSION}" "B58UUID CLI Manual"
+          .SH NAME
+          b58uuid \- Compact Base58 UUID Encoder CLI
+          .SH SYNOPSIS
+          .B b58uuid
+          [\fIOPTIONS\fR] \fICOMMAND\fR
+          .SH DESCRIPTION
+          B58UUID CLI converts UUIDs to compact 22-character Base58 format.
+          .SH COMMANDS
+          .TP
+          .B encode
+          Encode UUID to B58UUID format
+          .TP
+          .B decode
+          Decode B58UUID to standard UUID format
+          .TP
+          .B generate
+          Generate random B58UUID
+          .TP
+          .B validate
+          Validate UUID or B58UUID format
+          .SH OPTIONS
+          .TP
+          .B \-h, \-\-help
+          Display help information
+          .TP
+          .B \-V, \-\-version
+          Display version information
+          .SH EXAMPLES
+          .TP
+          b58uuid encode 550e8400-e29b-41d4-a716-446655440000
+          .TP
+          b58uuid decode BWBeN28Vb7cMEx7Ym8AUzs
+          .TP
+          b58uuid generate
+          .SH AUTHOR
+          B58UUID Contributors
+          .SH HOMEPAGE
+          https://b58uuid.io
+          EOF
+          
+          gzip -9 debian-pkg/usr/share/man/man1/b58uuid.1
+          
+          # Build package
+          dpkg-deb --build debian-pkg b58uuid_${VERSION}_${ARCH}.deb
+
+      - name: Build .rpm package
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # Create RPM build structure
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          
+          # Create spec file
+          cat > ~/rpmbuild/SPECS/b58uuid.spec << EOF
+          Name:           b58uuid
+          Version:        ${VERSION}
+          Release:        1%{?dist}
+          Summary:        Compact Base58 UUID Encoder CLI
+          License:        MIT
+          URL:            https://b58uuid.io
+          Source0:        b58uuid-linux-amd64.tar.gz
+          
+          %description
+          B58UUID CLI converts UUIDs to compact 22-character Base58 format.
+          Supports encoding, decoding, generation, and validation.
+          
+          %prep
+          
+          %build
+          
+          %install
+          mkdir -p %{buildroot}/usr/local/bin
+          cp %{_sourcedir}/../../../b58uuid %{buildroot}/usr/local/bin/
+          chmod 755 %{buildroot}/usr/local/bin/b58uuid
+          
+          %files
+          /usr/local/bin/b58uuid
+          
+          %changelog
+          * $(date "+%a %b %d %Y") B58UUID Contributors <hello@b58uuid.io> - ${VERSION}-1
+          - Release ${VERSION}
+          EOF
+          
+          # Build RPM
+          rpmbuild -bb ~/rpmbuild/SPECS/b58uuid.spec
+
+      - name: Upload packages to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            b58uuid_*.deb
+            ~/rpmbuild/RPMS/x86_64/b58uuid-*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-package-managers:
+    name: Update Package Manager Configs
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download release assets
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # Download all binaries
+          curl -LO https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-darwin-amd64.tar.gz
+          curl -LO https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-darwin-arm64.tar.gz
+          curl -LO https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-linux-amd64.tar.gz
+          curl -LO https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-windows-amd64.zip
+
+      - name: Calculate checksums
+        id: checksums
+        run: |
+          echo "darwin_amd64=$(shasum -a 256 b58uuid-darwin-amd64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "darwin_arm64=$(shasum -a 256 b58uuid-darwin-arm64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "linux_amd64=$(shasum -a 256 b58uuid-linux-amd64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "windows_amd64=$(shasum -a 256 b58uuid-windows-amd64.zip | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew tap
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # Clone homebrew-tap repository
+          git clone https://github.com/${{ github.repository_owner }}/homebrew-tap.git
+          cd homebrew-tap
+          
+          # Update formula with new checksums
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" Formula/b58uuid.rb
+          sed -i "s|url \".*darwin-amd64.tar.gz\"|url \"https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-darwin-amd64.tar.gz\"|" Formula/b58uuid.rb
+          sed -i "s|url \".*darwin-arm64.tar.gz\"|url \"https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-darwin-arm64.tar.gz\"|" Formula/b58uuid.rb
+          sed -i "s|url \".*linux-amd64.tar.gz\"|url \"https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-linux-amd64.tar.gz\"|" Formula/b58uuid.rb
+          sed -i "0,/sha256 \".*\"/s//sha256 \"${{ steps.checksums.outputs.darwin_amd64 }}\"/" Formula/b58uuid.rb
+          sed -i "0,/sha256 \".*\"/s//sha256 \"${{ steps.checksums.outputs.darwin_arm64 }}\"/" Formula/b58uuid.rb
+          sed -i "0,/sha256 \".*\"/s//sha256 \"${{ steps.checksums.outputs.linux_amd64 }}\"/" Formula/b58uuid.rb
+          
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/b58uuid.rb
+          git commit -m "Update b58uuid to v${VERSION}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Update Scoop bucket
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          
+          # Clone scoop-bucket repository
+          git clone https://github.com/${{ github.repository_owner }}/scoop-bucket.git
+          cd scoop-bucket
+          
+          # Update manifest
+          cat > b58uuid.json << EOF
+          {
+            "version": "${VERSION}",
+            "description": "Compact Base58 UUID Encoder CLI - Convert UUIDs to 22-character Base58 format",
+            "homepage": "https://b58uuid.io",
+            "license": "MIT",
+            "url": "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/b58uuid-windows-amd64.zip",
+            "hash": "${{ steps.checksums.outputs.windows_amd64 }}",
+            "bin": "b58uuid.exe",
+            "checkver": {
+              "github": "https://github.com/${{ github.repository }}"
+            },
+            "autoupdate": {
+              "url": "https://github.com/${{ github.repository }}/releases/download/v\$version/b58uuid-windows-amd64.zip"
+            }
+          }
+          EOF
+          
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add b58uuid.json
+          git commit -m "Update b58uuid to v${VERSION}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
